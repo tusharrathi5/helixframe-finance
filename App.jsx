@@ -136,10 +136,10 @@ export default function App() {
     </div>
   )
 
-  const md=months[active]||{expenses:[],income:{tusharReceived:0,dheerajReceived:0}}
-  const c=calc(md.expenses,md.income)
-  const tE=md.expenses.filter(e=>e.paidBy==='Tushar')
-  const dE=md.expenses.filter(e=>e.paidBy==='Dheeraj')
+  const md = months?.[active] || {expenses:[],income:{tusharReceived:0,dheerajReceived:0}}
+  const c = calc(md.expenses, md.income)
+  const tE = (md.expenses || []).filter(e => e.paidBy === 'Tushar')
+  const dE = (md.expenses || []).filter(e => e.paidBy === 'Dheeraj')
 
   // ── open add ──
   const openAdd=()=>{
