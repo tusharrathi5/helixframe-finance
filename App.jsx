@@ -73,11 +73,18 @@ const S={
 export default function App() {
   const [user,setUser]       = useState(()=>localStorage.getItem('hf-user')||null)
   const [months,setMonths]   = useState(null)
+  const [clients,setClients] = useState([])
   const [active,setActive]   = useState('Feb 2026')
   const [saving,setSaving]   = useState(false)
   const [online,setOnline]   = useState(true)
   const [lastSync,setLastSync] = useState(null)
   const [toast,setToast]     = useState(null)
+  const [clientForm,setClientForm] = useState({
+  client:'',
+  work:'',
+  amount:'',
+  receivedBy:'Tushar'
+})
 
   // expense modal
   const [expModal,setExpModal] = useState(false)
@@ -178,7 +185,28 @@ export default function App() {
     setMonths(updated); setDelModal(false)
     await write(updated)
   }
+// ── save client payment ──
+const saveClient = () => {
+  if(!clientForm.client || !clientForm.amount) return
 
+  const obj = {
+    id: Date.now(),
+    client: clientForm.client,
+    work: clientForm.work,
+    amount: +clientForm.amount,
+    receivedBy: clientForm.receivedBy
+  }
+
+  setClients([...clients, obj])
+
+  setClientForm({
+    client:'',
+    work:'',
+    amount:'',
+    receivedBy:'Tushar'
+  })
+}
+  
   // ── income ──
   const setIncome=async(who,val)=>{
     const v=parseFloat(val); if(isNaN(v)||v<0){showToast('Enter a valid amount',false);return}
