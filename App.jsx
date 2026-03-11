@@ -46,8 +46,13 @@ const Overlay=({onClose,children,wide})=>(
   </div>
 )
 
+const APP_PASSWORD = 'Helixfr@mes2026'
+
 // ══════════════════════════════════════════════════════════════
 export default function App() {
+  const [authed,setAuthed]   = useState(()=>localStorage.getItem('hf-authed')==='1')
+  const [pwInput,setPwInput] = useState('')
+  const [pwError,setPwError] = useState(false)
   const [user,setUser]       = useState(()=>localStorage.getItem('hf-user')||null)
   const [data,setData]       = useState(null)
   const [page,setPage]       = useState('finance')
@@ -75,6 +80,28 @@ export default function App() {
     catch{ showToast('Save failed',false) }
     setSaving(false)
   },[])
+
+  const submitPassword=()=>{
+    if(pwInput===APP_PASSWORD){ localStorage.setItem('hf-authed','1'); setAuthed(true); setPwError(false) }
+    else{ setPwError(true); setPwInput('') }
+  }
+
+  if(!authed) return(
+    <div style={{background:'#0f1510',minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'1.5rem',fontFamily:"'DM Mono',monospace"}}>
+      <div style={{fontFamily:"'Playfair Display',serif",fontSize:'2.2rem',fontWeight:300,color:'#7fff72',letterSpacing:'0.05em'}}>Helix Frame</div>
+      <div style={{color:'#6b7a62',fontSize:'0.62rem',letterSpacing:'0.35em'}}>ENTER PASSWORD TO CONTINUE</div>
+      <div style={{display:'flex',flexDirection:'column',gap:'0.75rem',alignItems:'center',width:260}}>
+        <input type="password" value={pwInput} onChange={e=>{setPwInput(e.target.value);setPwError(false)}}
+          onKeyDown={e=>e.key==='Enter'&&submitPassword()} placeholder="Password" autoFocus
+          style={{background:'#1a2a1a',border:`1px solid ${pwError?RED:'#2a4a2a'}`,padding:'0.75rem 1rem',fontFamily:"'DM Mono',monospace",fontSize:'0.85rem',color:'#f5f2eb',width:'100%',outline:'none',letterSpacing:'0.1em',textAlign:'center'}}/>
+        {pwError&&<div style={{color:RED,fontSize:'0.62rem',letterSpacing:'0.2em'}}>INCORRECT PASSWORD</div>}
+        <button onClick={submitPassword}
+          style={{background:'transparent',border:'2px solid #7fff72',color:'#7fff72',padding:'0.75rem 2rem',fontFamily:"'DM Mono',monospace",fontSize:'0.75rem',letterSpacing:'0.25em',cursor:'pointer',width:'100%'}}>
+          ENTER
+        </button>
+      </div>
+    </div>
+  )
 
   if(!user) return(
     <div style={{background:'#0f1510',minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'2rem',fontFamily:"'DM Mono',monospace"}}>
@@ -115,7 +142,7 @@ export default function App() {
             {saving?'SAVING…':online?`LIVE · ${lastSync||''}`:'OFFLINE'}
           </div>
           <button style={{background:'transparent',border:'1px solid #333',color:'#aaa',padding:'3px 10px',fontFamily:"'DM Mono',monospace",fontSize:'0.55rem',cursor:'pointer'}}
-            onClick={()=>{localStorage.removeItem('hf-user');setUser(null)}}>Switch user</button>
+            onClick={()=>{localStorage.removeItem('hf-user');localStorage.removeItem('hf-authed');setUser(null);setAuthed(false)}}>Lock & Exit</button>
         </div>
       </div>
 
