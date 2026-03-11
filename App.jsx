@@ -160,7 +160,7 @@ export default function App() {
   const saveExpense=async()=>{
     if(!form.name.trim()||!form.amount||isNaN(+form.amount)||+form.amount<=0){showToast('Fill in all fields',false);return}
     const obj={name:form.name.trim(),amount:+form.amount,paidBy:form.paidBy,category:form.category,type:form.type,addedBy:user}
-    const arr=[...md.expenses]
+    const arr=[...(md.expenses || [])]
     if(editId!==null){const i=arr.findIndex(x=>x.id===editId);if(i>-1)arr[i]={...arr[i],...obj}}
     else arr.push({id:Date.now(),...obj})
     const updated={...months,[active]:{...md,expenses:arr}}
