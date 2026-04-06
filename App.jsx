@@ -176,7 +176,12 @@ function FinancePage({data,setData,write,user,showToast}){
   const [delModal,setDelModal]=useState(false)
   const [delId,setDelId]=useState(null),[delDesc,setDelDesc]=useState('')
 
-  useEffect(()=>{ if(!months[active]) setActive(Object.keys(months)[0]) },[months])
+  useEffect(() => {
+    if (active && !months[active]) {
+      const keys = Object.keys(months)
+      if (keys.length > 0) setActive(keys[0])
+    }
+  }, [active, months])
 
   const md=months[active]||{expenses:[],income:{tusharReceived:0,dheerajReceived:0}}
   const c=calcFinance(md.expenses,md.income)
