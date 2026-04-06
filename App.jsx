@@ -183,7 +183,8 @@ function FinancePage({data,setData,write,user,showToast}){
     }
   }, [active, months])
 
-  const md=months[active]||{expenses:[],income:{tusharReceived:0,dheerajReceived:0}}
+  const rawMd=months[active]||{}
+const md={...rawMd,expenses:rawMd.expenses??[],income:rawMd.income??{tusharReceived:0,dheerajReceived:0}}
   const c=calcFinance(md.expenses,md.income)
   const tE=md.expenses.filter(e=>e.paidBy==='Tushar')
   const dE=md.expenses.filter(e=>e.paidBy==='Dheeraj')
