@@ -183,8 +183,9 @@ function FinancePage({data,setData,write,user,showToast}){
     }
   }, [active, months])
 
+  const monthKeys=Object.keys(months)
   const rawMd=months[active]||{}
-const md={...rawMd,expenses:rawMd.expenses??[],income:rawMd.income??{tusharReceived:0,dheerajReceived:0}}
+  const md={...rawMd,expenses:rawMd.expenses??[],income:rawMd.income??{tusharReceived:0,dheerajReceived:0}}
   const c=calcFinance(md.expenses,md.income)
   const tE=md.expenses.filter(e=>e.paidBy==='Tushar')
   const dE=md.expenses.filter(e=>e.paidBy==='Dheeraj')
@@ -231,6 +232,7 @@ const md={...rawMd,expenses:rawMd.expenses??[],income:rawMd.income??{tusharRecei
   }
 
   const sf=c.s.from,st=c.s.to
+  const signedFmt=n=>(n<0?'-':'')+fmt(n)
   const pbr=(l,v,col)=>(<div style={{display:'flex',justifyContent:'space-between',fontSize:'0.68rem',padding:'0.35rem 0',borderBottom:'1px solid #d8d5cc'}}><span style={{color:'#7a7870'}}>{l}</span><span style={{color:col||'#1a1a18',fontWeight:col?500:400}}>{v}</span></div>)
   const ExpRow=({e,who})=>{
     const col=CAT_COL[e.category]||'#888'
@@ -272,16 +274,38 @@ const md={...rawMd,expenses:rawMd.expenses??[],income:rawMd.income??{tusharRecei
       <div style={{display:'flex',gap:'0.75rem'}}><button style={{...btnD,background:RED}} onClick={confirmDel}>DELETE</button><button style={btnG} onClick={()=>setDelModal(false)}>Cancel</button></div>
     </Overlay>}
 
-    {/* TABS */}
-    <div style={{display:'flex',gap:6,flexWrap:'wrap',padding:'1rem 2rem',background:'#eceae0',borderBottom:'1px solid #d8d5cc'}}>
-      {Object.keys(months).map(m=><button key={m} onClick={()=>setActive(m)} style={{background:m===active?'#1a1a18':'transparent',color:m===active?'#f5f2eb':'#7a7870',border:'1px solid',borderColor:m===active?'#1a1a18':'#d8d5cc',padding:'0.35rem 0.9rem',fontFamily:"'DM Mono',monospace",fontSize:'0.62rem',cursor:'pointer'}}>{m}</button>)}
-      <button style={{background:'transparent',border:'1px solid #d8d5cc',color:'#7a7870',padding:'0.35rem 0.9rem',fontFamily:"'DM Mono',monospace",fontSize:'0.62rem',cursor:'pointer'}} onClick={addMonth}>+ NEW MONTH</button>
+    {/* MONTH SELECTOR */}
+    <div style={{display:'flex',gap:'0.75rem',flexWrap:'wrap',padding:'1rem 2rem',background:'#eceae0',borderBottom:'1px solid #d8d5cc',alignItems:'flex-end'}}>
+      <div style={{minWidth:220}}>
+        <label style={fl}>MONTH</label>
+        <select style={{...fi,background:'#f5f2eb',padding:'0.45rem 0.8rem',fontSize:'0.68rem'}} value={active} onChange={e=>setActive(e.target.value)}>
+          {monthKeys.map(m=><option key={m} value={m}>{m}</option>)}
+        </select>
+      </div>
+      <button style={{background:'transparent',border:'1px solid #d8d5cc',color:'#7a7870',padding:'0.48rem 0.9rem',fontFamily:"'DM Mono',monospace",fontSize:'0.62rem',cursor:'pointer'}} onClick={addMonth}>+ NEW MONTH</button>
     </div>
 
     {/* SUMMARY */}
     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:1,background:'#d8d5cc',margin:'1.5rem',border:'1px solid #d8d5cc'}}>
       {[{l:'Total Expenses',v:fmt(c.tot),col:null,s:'Combined'},{l:'Tushar Paid',v:fmt(c.tP),col:T,s:`Share ${fmt(c.sh)} · ${c.tP>=c.sh?`+${fmt(c.tP-c.sh)}`:`-${fmt(c.sh-c.tP)}`}`},{l:'Dheeraj Paid',v:fmt(c.dP),col:D,s:`Share ${fmt(c.sh)} · ${c.dP>=c.sh?`+${fmt(c.dP-c.sh)}`:`-${fmt(c.sh-c.dP)}`}`},{l:'Total Income',v:fmt(c.totR),col:G,s:`T:${fmt(c.tR)} D:${fmt(c.dR)}`},{l:'Net Profit',v:fmt(c.profit),col:GOLD,s:`${fmt(c.ps)} each`}]
         .map(card=><div key={card.l} style={{background:'#f5f2eb',padding:'1.2rem 1.4rem'}}><div style={{fontSize:'0.58rem',letterSpacing:'0.22em',color:'#7a7870',textTransform:'uppercase'}}>{card.l}</div><div style={{fontFamily:"'Playfair Display',serif",fontSize:'1.7rem',color:card.col||'#1a1a18',lineHeight:1,margin:'5px 0 3px'}}>{card.v}</div><div style={{fontSize:'0.58rem',color:'#7a7870'}}>{card.s}</div></div>)}
+    </div>
+
+    {/* MONTHLY EARNINGS */}
+    <SL>Earned This Month After Expenses</SL>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:1,background:'#d8d5cc',margin:'0 1.5rem 1.5rem',border:'1px solid #d8d5cc'}}>
+      {[{name:'Tushar',col:T},{name:'Dheeraj',col:D}].map(p=>(
+        <div key={p.name} style={{background:'#f5f2eb',padding:'1.2rem 1.4rem'}}>
+          <div style={{fontSize:'0.58rem',letterSpacing:'0.22em',color:'#7a7870',textTransform:'uppercase'}}>{p.name} earned</div>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:'1.8rem',color:c.ps>=0?p.col:RED,lineHeight:1,margin:'6px 0 4px'}}>{signedFmt(c.ps)}</div>
+          <div style={{fontSize:'0.58rem',color:'#7a7870'}}>Net profit split 50/50 after {fmt(c.tot)} expenses</div>
+        </div>
+      ))}
+      <div style={{background:'#f5f2eb',padding:'1.2rem 1.4rem'}}>
+        <div style={{fontSize:'0.58rem',letterSpacing:'0.22em',color:'#7a7870',textTransform:'uppercase'}}>Calculation</div>
+        <div style={{fontFamily:"'Playfair Display',serif",fontSize:'1.35rem',color:c.profit>=0?G:RED,lineHeight:1.15,margin:'7px 0 5px'}}>{fmt(c.totR)} - {fmt(c.tot)} = {signedFmt(c.profit)}</div>
+        <div style={{fontSize:'0.58rem',color:'#7a7870'}}>Total income minus total expenses</div>
+      </div>
     </div>
 
     {/* SETTLEMENT */}
