@@ -5,3 +5,41 @@ button:hover{opacity:0.85;}
 input:focus,select:focus{outline:2px solid #1a1a18;outline-offset:-2px;}
 @keyframes pulse{0%,100%{opacity:0.4;transform:scale(1)}50%{opacity:1;transform:scale(1.2)}}
 @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+.my-transfer{max-width:1120px;margin:0 auto;padding:28px 24px 36px;color:#1a1a18;}
+.transfer-heading{display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap;margin-bottom:24px;}
+.transfer-heading h1{font-family:'Playfair Display',serif;font-weight:400;font-size:28px;}
+.transfer-heading p{font-size:11px;color:#66665e;margin-top:6px;}
+.transfer-month{display:grid;gap:7px;font-size:11px;min-width:190px;}
+.my-transfer select,.my-transfer input{font:inherit;color:inherit;border:1px solid #c5c4bb;background:#fff;padding:9px 10px;min-width:0;max-width:100%;}
+.transfer-warning{font-size:12px;line-height:1.6;padding:12px 14px;border-left:3px solid #b88c1a;background:#fff4d9;margin-bottom:16px;}
+.transfer-result{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;background:#1a1a18;color:#f5f2eb;padding:24px;}
+.transfer-result h2{font-weight:400;font-size:15px;}
+.transfer-result p{font-size:11px;color:#c0c2b7;margin-top:7px;}
+.transfer-result output{font-family:'Playfair Display',serif;font-size:36px;color:#7fff72;overflow-wrap:anywhere;}
+.transfer-breakdown{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));border-bottom:1px solid #d8d5cc;gap:20px;padding:22px 0;}
+.transfer-breakdown dt{font-size:11px;color:#66665e;line-height:1.6;}
+.transfer-breakdown dd{font-size:22px;margin-top:7px;overflow-wrap:anywhere;}
+.transfer-loss{color:#c0392b;}
+.transfer-prior{display:grid;grid-template-columns:minmax(200px,300px) 1fr;gap:24px;align-items:center;margin:24px 0;}
+.transfer-prior label{display:grid;gap:8px;font-size:12px;}
+.transfer-prior p{font-size:11px;line-height:1.8;color:#66665e;}
+.transfer-expenses h2{font-size:14px;font-weight:500;margin-bottom:12px;}
+.transfer-expenses>p{font-size:12px;padding:16px 0;}
+.transfer-table-wrap{overflow-x:auto;border:1px solid #d8d5cc;}
+.transfer-expenses table{width:100%;border-collapse:collapse;min-width:590px;font-size:12px;}
+.transfer-expenses th{font-weight:500;background:#eceae0;}
+.transfer-expenses td,.transfer-expenses th{padding:12px 14px;text-align:left;border-bottom:1px solid #d8d5cc;}
+.transfer-expenses tbody tr:last-child td{border-bottom:0;}
+.transfer-expenses td:first-child{overflow-wrap:anywhere;max-width:260px;}
+.transfer-expenses th:nth-child(2),.transfer-expenses th:last-child,.transfer-expenses td:nth-child(2),.transfer-expenses td:last-child{text-align:right;white-space:nowrap;}
+.transfer-expenses select{width:180px;}
+.transfer-totals{display:flex;flex-wrap:wrap;gap:12px 24px;font-size:11px;color:#66665e;margin-top:18px;line-height:1.6;}
+@media(max-width:600px){
+  .my-transfer{padding:20px 16px 28px;}
+  .transfer-month{width:100%;}
+  .transfer-result{padding:20px;}
+  .transfer-result output{font-size:30px;}
+  .transfer-prior{grid-template-columns:1fr;gap:12px;}
+}
+
