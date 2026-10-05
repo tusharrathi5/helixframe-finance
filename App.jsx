@@ -1,26 +1,17 @@
 import { useState, useEffect, useCallback } from 'react'
 import { db } from './firebase'
 import { ref, onValue, set } from 'firebase/database'
+import MyTransferPage from './MyTransferPage'
+import { calcFinance, formatMoney, getEffectiveIncome, syncClientIncome } from './finance.mjs'
 
 const T='#2a5caa',TL='#e8eef8',D='#b84c1e',DL='#faeee8',G='#2d7a45',GOLD='#c8960c',RED='#c0392b'
 const CAT_COL={'Platform Fee':'#b84c1e','Staff / Freelancer':'#2d7a45','Tools & Software':'#c8960c','Domain / Hosting':'#2a5caa','Subscription':'#7a4fcf','Other':'#888'}
 const WORK_TYPES=['Website Development','3D Modelling','Rendering','Product Visualization','Motion Graphics','UI/UX Design','Other']
 const STATUS_COL={Active:G,'Pending Payment':GOLD,Completed:T,Cancelled:RED}
 
-const fmt  = n => '₹'+Math.abs(Math.round(n)).toLocaleString('en-IN')
+const fmt  = formatMoney
 const ts   = () => new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})
 const today= () => new Date().toISOString().split('T')[0]
-
-function calcFinance(expenses=[], income={tusharReceived:0,dheerajReceived:0}) {
-  const tP=expenses.filter(e=>e.paidBy==='Tushar').reduce((s,e)=>s+e.amount,0)
-  const dP=expenses.filter(e=>e.paidBy==='Dheeraj').reduce((s,e)=>s+e.amount,0)
-  const tot=tP+dP, sh=tot/2
-  const tR=income.tusharReceived||0, dR=income.dheerajReceived||0
-  const totR=tR+dR, profit=totR-tot, ps=profit/2
-  const np=(tP-sh)-(tR-totR/2)
-  return {tP,dP,tot,sh,tR,dR,totR,profit,ps,
-    s:{amt:Math.abs(np),from:np>0?'Dheeraj':'Tushar',to:np>0?'Tushar':'Dheeraj'}}
-}
 
 const btnD ={background:'#1a1a18',color:'#f5f2eb',border:'none',padding:'0.6rem 1.4rem',fontFamily:"'DM Mono',monospace",fontSize:'0.63rem',letterSpacing:'0.18em',cursor:'pointer'}
 const btnG ={background:'transparent',border:'1px solid #d8d5cc',color:'#7a7870',padding:'0.6rem 1rem',fontFamily:"'DM Mono',monospace",fontSize:'0.63rem',cursor:'pointer'}
@@ -142,20 +133,22 @@ export default function App() {
             {saving?'SAVING…':online?`LIVE · ${lastSync||''}`:'OFFLINE'}
           </div>
           <button style={{background:'transparent',border:'1px solid #333',color:'#aaa',padding:'3px 10px',fontFamily:"'DM Mono',monospace",fontSize:'0.55rem',cursor:'pointer'}}
-            onClick={()=>{localStorage.removeItem('hf-user');localStorage.removeItem('hf-authed');setUser(null);setAuthed(false)}}>Lock & Exit</button>
+            onClick={()=>{localStorage.removeItem('hf-user');localStorage.removeItem('hf-authed');setUser(null);setAuthed(false);setPage('finance')}}>Lock & Exit</button>
         </div>
       </div>
 
       {/* NAV */}
-      <div style={{display:'flex',background:'#1a1a18',borderTop:'1px solid #2a2a28',padding:'0 2rem'}}>
-        {[['finance','📊 Finance'],['clients','🤝 Clients']].map(([k,lbl])=>(
+      <div style={{display:'flex',flexWrap:'wrap',background:'#1a1a18',borderTop:'1px solid #2a2a28',padding:'0 1rem'}}>
+        {[['finance','📊 Finance'],['clients','🤝 Clients'],...(user==='Tushar'?[['my-transfer','My Transfer']]:[])].map(([k,lbl])=>(
           <button key={k} onClick={()=>setPage(k)} style={{background:'transparent',border:'none',color:page===k?'#7fff72':'#555',padding:'0.75rem 1.2rem',fontFamily:"'DM Mono',monospace",fontSize:'0.63rem',letterSpacing:'0.18em',cursor:'pointer',borderBottom:page===k?'2px solid #7fff72':'2px solid transparent',transition:'color 0.2s'}}>
             {lbl}
           </button>
         ))}
       </div>
 
-      {page==='finance'
+      {page==='my-transfer'&&user==='Tushar'
+        ? <MyTransferPage data={data} user={user}/>
+        : page==='finance'
         ? <FinancePage data={data} setData={setData} write={write} user={user} showToast={showToast}/>
         : <ClientsPage data={data} setData={setData} write={write} user={user} showToast={showToast}/>}
 
@@ -186,12 +179,13 @@ function FinancePage({data,setData,write,user,showToast}){
   const monthKeys=Object.keys(months)
   const rawMd=months[active]||{}
   const md={...rawMd,expenses:rawMd.expenses??[],income:rawMd.income??{tusharReceived:0,dheerajReceived:0}}
-  const c=calcFinance(md.expenses,md.income)
+  const effectiveIncome=getEffectiveIncome(md)
+  const c=calcFinance(md.expenses,effectiveIncome)
   const tE=md.expenses.filter(e=>e.paidBy==='Tushar')
   const dE=md.expenses.filter(e=>e.paidBy==='Dheeraj')
 
   const saveExp=async()=>{
-    if(!form.name.trim()||!form.amount||isNaN(+form.amount)||+form.amount<=0){showToast('Fill in all fields',false);return}
+    if(!form.name.trim()||!form.amount||!Number.isFinite(+form.amount)||+form.amount<=0){showToast('Fill in all fields',false);return}
     const obj={name:form.name.trim(),amount:+form.amount,paidBy:form.paidBy,category:form.category,type:form.type,addedBy:user}
     const arr=[...md.expenses]
     if(editId!==null){const i=arr.findIndex(x=>x.id===editId);if(i>-1)arr[i]={...arr[i],...obj}}
@@ -207,9 +201,15 @@ function FinancePage({data,setData,write,user,showToast}){
     setData(nd);setDelModal(false);await write(nd)
   }
   const setIncome=async(who,val)=>{
-    const v=parseFloat(val);if(isNaN(v)||v<0){showToast('Enter a valid amount',false);return}
+    const v=Number(val);if(val.trim()===''||!Number.isFinite(v)||v<0){showToast('Enter a valid amount',false);return}
     const key=who==='Tushar'?'tusharReceived':'dheerajReceived'
-    const nd={...data,months:{...months,[active]:{...md,income:{...md.income,[key]:v}}}}
+    const nd={...data,months:{...months,[active]:{...md,incomeOverrides:{...md.incomeOverrides,[key]:v}}}}
+    setData(nd);await write(nd)
+  }
+  const useClientIncome=async(who)=>{
+    const key=who==='Tushar'?'tusharReceived':'dheerajReceived'
+    const overrides={...md.incomeOverrides};delete overrides[key]
+    const nd={...data,months:{...months,[active]:{...md,incomeOverrides:overrides}}}
     setData(nd);await write(nd)
   }
   const addMonth=async()=>{
@@ -232,7 +232,7 @@ function FinancePage({data,setData,write,user,showToast}){
   }
 
   const sf=c.s.from,st=c.s.to
-  const signedFmt=n=>(n<0?'-':'')+fmt(n)
+  const signedFmt=fmt
   const pbr=(l,v,col)=>(<div style={{display:'flex',justifyContent:'space-between',fontSize:'0.68rem',padding:'0.35rem 0',borderBottom:'1px solid #d8d5cc'}}><span style={{color:'#7a7870'}}>{l}</span><span style={{color:col||'#1a1a18',fontWeight:col?500:400}}>{v}</span></div>)
   const ExpRow=({e,who})=>{
     const col=CAT_COL[e.category]||'#888'
@@ -287,7 +287,7 @@ function FinancePage({data,setData,write,user,showToast}){
 
     {/* SUMMARY */}
     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:1,background:'#d8d5cc',margin:'1.5rem',border:'1px solid #d8d5cc'}}>
-      {[{l:'Total Expenses',v:fmt(c.tot),col:null,s:'Combined'},{l:'Tushar Paid',v:fmt(c.tP),col:T,s:`Share ${fmt(c.sh)} · ${c.tP>=c.sh?`+${fmt(c.tP-c.sh)}`:`-${fmt(c.sh-c.tP)}`}`},{l:'Dheeraj Paid',v:fmt(c.dP),col:D,s:`Share ${fmt(c.sh)} · ${c.dP>=c.sh?`+${fmt(c.dP-c.sh)}`:`-${fmt(c.sh-c.dP)}`}`},{l:'Total Income',v:fmt(c.totR),col:G,s:`T:${fmt(c.tR)} D:${fmt(c.dR)}`},{l:'Net Profit',v:fmt(c.profit),col:GOLD,s:`${fmt(c.ps)} each`}]
+      {[{l:'Total Expenses',v:fmt(c.tot),col:null,s:'Combined'},{l:'Tushar Paid',v:fmt(c.tP),col:T,s:`Share ${fmt(c.sh)} · ${c.tP>=c.sh?`+${fmt(c.tP-c.sh)}`:`-${fmt(c.sh-c.tP)}`}`},{l:'Dheeraj Paid',v:fmt(c.dP),col:D,s:`Share ${fmt(c.sh)} · ${c.dP>=c.sh?`+${fmt(c.dP-c.sh)}`:`-${fmt(c.sh-c.dP)}`}`},{l:'Total Income',v:fmt(c.totR),col:G,s:`T:${fmt(c.tR)} D:${fmt(c.dR)}`},{l:'Net Profit',v:fmt(c.profit),col:c.profit<0?RED:GOLD,s:'Split 50/50 after expenses'}]
         .map(card=><div key={card.l} style={{background:'#f5f2eb',padding:'1.2rem 1.4rem'}}><div style={{fontSize:'0.58rem',letterSpacing:'0.22em',color:'#7a7870',textTransform:'uppercase'}}>{card.l}</div><div style={{fontFamily:"'Playfair Display',serif",fontSize:'1.7rem',color:card.col||'#1a1a18',lineHeight:1,margin:'5px 0 3px'}}>{card.v}</div><div style={{fontSize:'0.58rem',color:'#7a7870'}}>{card.s}</div></div>)}
     </div>
 
@@ -297,7 +297,7 @@ function FinancePage({data,setData,write,user,showToast}){
       {[{name:'Tushar',col:T},{name:'Dheeraj',col:D}].map(p=>(
         <div key={p.name} style={{background:'#f5f2eb',padding:'1.2rem 1.4rem'}}>
           <div style={{fontSize:'0.58rem',letterSpacing:'0.22em',color:'#7a7870',textTransform:'uppercase'}}>{p.name} earned</div>
-          <div style={{fontFamily:"'Playfair Display',serif",fontSize:'1.8rem',color:c.ps>=0?p.col:RED,lineHeight:1,margin:'6px 0 4px'}}>{signedFmt(c.ps)}</div>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:'1.8rem',color:c.profitShares[p.name]>=0?p.col:RED,lineHeight:1,margin:'6px 0 4px'}}>{signedFmt(c.profitShares[p.name])}</div>
           <div style={{fontSize:'0.58rem',color:'#7a7870'}}>Net profit split 50/50 after {fmt(c.tot)} expenses</div>
         </div>
       ))}
@@ -312,7 +312,7 @@ function FinancePage({data,setData,write,user,showToast}){
     <div style={{margin:'0 1.5rem 1.5rem',background:'#1a1a18',color:'#f5f2eb',padding:'1.2rem 1.8rem',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'1rem'}}>
       <div>
         <div style={{fontFamily:"'Playfair Display',serif",fontSize:'1rem',fontStyle:'italic'}}>
-          <strong style={{fontStyle:'normal',color:sf===T?T:D}}>{sf}</strong> pays <strong style={{fontStyle:'normal',color:st===T?T:D}}>{st}</strong> to settle this month
+          {c.s.amt===0?'No settlement needed':<><strong style={{fontStyle:'normal',color:sf==='Tushar'?T:D}}>{sf}</strong> pays <strong style={{fontStyle:'normal',color:st==='Tushar'?T:D}}>{st}</strong> to settle this month</>}
         </div>
         <div style={{fontSize:'0.58rem',opacity:0.4,marginTop:5,letterSpacing:'0.15em'}}>Balances expense overpay + income difference</div>
       </div>
@@ -352,12 +352,13 @@ function FinancePage({data,setData,write,user,showToast}){
         <div key={p.who} style={{background:'#f5f2eb',padding:'1.1rem 1.4rem'}}>
           <div style={{fontSize:'0.58rem',letterSpacing:'0.2em',color:'#7a7870',marginBottom:4}}>{p.who.toUpperCase()} RECEIVED</div>
           <div style={{fontFamily:"'Playfair Display',serif",fontSize:'1.4rem',color:p.col}}>{fmt(p.val)}</div>
-          <div style={{fontSize:'0.58rem',color:'#7a7870',marginTop:3,marginBottom:8}}>Auto-synced from Clients page</div>
+          <div style={{fontSize:'0.58rem',color:'#7a7870',marginTop:3,marginBottom:8}}>{md.incomeOverrides?.[p.who==='Tushar'?'tusharReceived':'dheerajReceived']!==undefined?'Manual override active':'Auto-synced from Clients page'}</div>
           <div style={{display:'flex',gap:6,alignItems:'center'}}>
-            <input id={p.id} type="number" defaultValue={p.val||''} placeholder="Manual override"
+            <input key={`${active}-${p.val}`} id={p.id} type="number" min="0" step="0.01" defaultValue={p.val} placeholder="Manual override"
               style={{background:'#eceae0',border:'1px solid #d8d5cc',padding:'5px 8px',fontFamily:"'DM Mono',monospace",fontSize:'0.7rem',color:'#1a1a18',width:140,outline:'none'}}/>
             <button style={{...btnD,padding:'5px 10px',fontSize:'0.6rem'}} onClick={()=>setIncome(p.who,document.getElementById(p.id).value)}>SET</button>
           </div>
+          {md.incomeOverrides?.[p.who==='Tushar'?'tusharReceived':'dheerajReceived']!==undefined&&<button style={{...btnG,marginTop:8,fontSize:'0.6rem'}} onClick={()=>useClientIncome(p.who)}>Use client income</button>}
         </div>
       ))}
       <div style={{background:'#f5f2eb',padding:'1.1rem 1.4rem'}}>
@@ -366,8 +367,8 @@ function FinancePage({data,setData,write,user,showToast}){
       </div>
       <div style={{background:'#f5f2eb',padding:'1.1rem 1.4rem'}}>
         <div style={{fontSize:'0.58rem',letterSpacing:'0.2em',color:'#7a7870',marginBottom:4}}>NET PROFIT</div>
-        <div style={{fontFamily:"'Playfair Display',serif",fontSize:'1.4rem',color:G}}>{fmt(c.profit)}</div>
-        <div style={{fontSize:'0.58rem',color:'#7a7870',marginTop:3}}>{fmt(c.ps)} each (50/50)</div>
+        <div style={{fontFamily:"'Playfair Display',serif",fontSize:'1.4rem',color:c.profit<0?RED:G}}>{fmt(c.profit)}</div>
+        <div style={{fontSize:'0.58rem',color:'#7a7870',marginTop:3}}>T: {fmt(c.profitShares.Tushar)} · D: {fmt(c.profitShares.Dheeraj)}</div>
       </div>
     </div>
 
@@ -381,8 +382,8 @@ function FinancePage({data,setData,write,user,showToast}){
           {pbr('Fair share',fmt(c.sh))}
           {pbr('Expense difference',(p.paid>=c.sh?'+':'-')+fmt(Math.abs(p.paid-c.sh)),p.paid>=c.sh?G:RED)}
           {pbr('Income received',fmt(p.rec),p.col)}
-          {pbr('Profit share (50%)',fmt(c.ps),G)}
-          <div style={{display:'flex',justifyContent:'space-between',fontSize:'0.72rem',padding:'0.35rem 0',fontWeight:500}}><span style={{color:'#7a7870'}}>Should receive</span><span style={{color:G}}>{fmt(c.sh+c.ps)}</span></div>
+          {pbr('Profit share (50%)',fmt(c.profitShares[p.name]),c.profitShares[p.name]<0?RED:G)}
+          <div style={{display:'flex',justifyContent:'space-between',fontSize:'0.72rem',padding:'0.35rem 0',fontWeight:500}}><span style={{color:'#7a7870'}}>{c.s.amt===0?'Settlement':c.s.from===p.name?'Settlement to pay':'Settlement to receive'}</span><span style={{color:c.s.from===p.name&&c.s.amt>0?RED:G}}>{fmt(c.s.amt)}</span></div>
         </div>
       ))}
     </div>
@@ -421,13 +422,7 @@ function ClientsPage({data,setData,write,user,showToast}){
 
   // auto-sync: recalculate income per month from clients
   const syncAndSave=async(newClients)=>{
-    const updMonths={...months}
-    Object.keys(updMonths).forEach(mn=>{
-      const mc=newClients.filter(c=>c.month===mn)
-      const tR=mc.filter(c=>c.receivedBy==='Tushar').reduce((s,c)=>s+(+c.amountReceived||0),0)
-      const dR=mc.filter(c=>c.receivedBy==='Dheeraj').reduce((s,c)=>s+(+c.amountReceived||0),0)
-      updMonths[mn]={...updMonths[mn],income:{tusharReceived:tR,dheerajReceived:dR}}
-    })
+    const updMonths=syncClientIncome(months,newClients)
     const nd={...data,months:updMonths,clients:newClients}
     setData(nd); await write(nd)
   }
@@ -437,6 +432,7 @@ function ClientsPage({data,setData,write,user,showToast}){
 
   const saveClient=async()=>{
     if(!form.clientName.trim()){showToast('Client name required',false);return}
+    if(!Number.isFinite(+form.projectValue)||!Number.isFinite(+form.amountReceived)||+form.projectValue<0||+form.amountReceived<0){showToast('Enter valid non-negative project and payment amounts',false);return}
     const obj={...form,projectValue:+form.projectValue||0,amountReceived:+form.amountReceived||0,updatedBy:user,updatedAt:today()}
     const nc=editId!==null?clients.map(c=>c.id===editId?{...c,...obj}:c):[...clients,{id:Date.now(),...obj}]
     setModal(false); await syncAndSave(nc); showToast('Client saved & income synced ✓')
@@ -543,3 +539,4 @@ function ClientsPage({data,setData,write,user,showToast}){
     </div>
   </>)
 }
+
